@@ -1,6 +1,8 @@
 from twisted.internet import threads, defer
 import urllib2
 import logging
+import cStringIO
+from XunfeiPool import XunfeiPool
 
 class AsyncOpenHttp(object):
     def __init__(self, callback):
@@ -12,6 +14,17 @@ class AsyncOpenHttp(object):
         d.addCallback(self.callback, requestId, dictation)
         d.addErrback(self.onError)
         return d
+    
+    def make_xunfei_request(self, flac, requestId, dictation, language="de-DE", allowCurses=True):
+        d = threads.deferToThread(self.xf_run, flac, requestId, dictation, language, allowCurses)
+        d.addCallback(self.callback, requestId, dictation)
+        d.addErrback(self.onError)
+        return d
+
+    def onXfError(self, failure):
+        failure.trap(defer.CancelledError)
+        logging.getLogger().info("Xunfei request canceled")
+        pass
     
     def onError(self, failure):
         failure.trap(defer.CancelledError)
@@ -25,3 +38,18 @@ class AsyncOpenHttp(object):
             return body
         except:
             return None
+
+    def xf_run(self, flac, requestId, dictation, language, allowCurses):
+        xfconn = XunfeiPool()
+        sess = xfconn.get_session()
+        try:
+            sio = cStringIO.StringIO(flac)
+            sess.uploadAudio(sio)
+            content = sess.getResult()
+            sio.close
+            return content
+        except:
+            return None
+        finally:
+            xfconn.release_session(sess)
+

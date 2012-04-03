@@ -115,3 +115,42 @@ class Encoder:
             libflac.FLAC__stream_encoder_delete(self.encoder)
             os.unlink(self.filename)
             self.encoder = None
+
+class FakeEncoder:
+    
+    def __init__(self):
+        self.encoder = None
+        self.output = None
+        self.filename = None
+
+    
+    def initialize(self, sample_rate, channels, bps):
+        tmpFile = tempfile.NamedTemporaryFile(delete=False)
+        tmpFile.close()
+        self.filename = tmpFile.name
+    
+    def internalCallBack(self, encoder, buf, numBytes, samples, current_frame):
+        return 0
+    
+
+
+    def encode(self, data):
+        f = open(self.filename, 'a')
+        f.write(data)
+        f.close()
+
+    def getBinary(self):
+        f = open(self.filename, 'r')
+        flac = f.read()
+        f.close()
+        return flac
+        
+    def finish(self):
+        if self.encoder:
+            return 
+    
+    def destroy(self):
+        if self.encoder:
+            os.unlink(self.filename)
+            self.encoder = None
+            self.filename = None

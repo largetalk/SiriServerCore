@@ -40,7 +40,7 @@ class SiriProtocolHandler(Siri):
         self.dbConnection = server.dbConnection
         self.assistant = None
         self.speech = dict()
-        self.httpClient = AsyncOpenHttp(self.handle_google_data)
+        self.httpClient = AsyncOpenHttp(self.handle_xunfei_data)
         self.current_google_request = None
         self.current_location = None
         self.lastPingTime = time.time()
@@ -93,6 +93,18 @@ class SiriProtocolHandler(Siri):
             self.send_object(SpeechFailure(requestId, "No connection to Google possible"))
             self.send_object(RequestCompleted(requestId))
         
+    def handle_xunfei_data(self, content, requestId, dictation):
+        self.current_google_request = None
+        if (content != None):
+            xunfeiAnswer = {'status':0, 'id':'c421dee91abe31d9b8457f2a80ebca91-1'}
+            hypotheses = [{'utterance': content, 'confidence':0.99}]
+            xunfeiAnswer['hypotheses'] = hypotheses
+
+            self.process_recognized_speech(xunfeiAnswer, requestId, dictation)
+        else:
+            self.send_object(SpeechFailure(requestId, "No connection to Google possible"))
+            self.send_object(RequestCompleted(requestId))
+
     def received_ping(self, numOfPing):
         self.pong += 1
         self.lastPing = numOfPing
@@ -179,7 +191,7 @@ class SiriProtocolHandler(Siri):
                 startSpeech = StartSpeechRequest(plist)
     
             decoder = speex.Decoder()
-            encoder = flac.Encoder()
+            encoder = flac.FakeEncoder()
             speexUsed = False
             if startSpeech.codec == StartSpeech.CodecSpeex_WB_Quality8Value:
                 decoder.initialize(mode=speex.SPEEX_MODEID_WB)
@@ -235,7 +247,8 @@ class SiriProtocolHandler(Siri):
                 if flacBin != None:
                     self.logger.info("Sending flac to google for recognition")
                     try:
-                        self.current_google_request = self.httpClient.make_google_request(flacBin, finishSpeech.refId, dictation, language=self.assistant.language, allowCurses=True)
+                        self.current_google_request = self.httpClient.make_xunfei_request(flacBin, finishSpeech.refId, dictation, language=self.assistant.language, allowCurses=True)
+                        #self.current_google_request = self.httpClient.make_google_request(flacBin, finishSpeech.refId, dictation, language=self.assistant.language, allowCurses=True)
                     except (AttributeError, TypeError):
                         self.logger.warning("Unable to find language record for this assistant. Try turning Siri off and then back on.")
                 else:
@@ -319,6 +332,7 @@ class SiriProtocolHandler(Siri):
                     self.assistant.timeZoneId = objProperties['timeZoneId']
                     self.assistant.language = objProperties['language']
                     self.assistant.region = objProperties['region']
+                    self.assistant.language = 'zh-CN'
                     #Record the user firstName and nickName                    
                     try:                        
                         self.assistant.firstName = objProperties["meCards"][0]["properties"]["firstName"].encode("utf-8")
